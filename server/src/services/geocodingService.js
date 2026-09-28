@@ -17,6 +17,27 @@ const getCoordinatesByCity = async (city) => {
   return response.data;
 };
 
+
+const searchLocations = async (query) => {
+  const apiKey = process.env.GEOAPIFY_API_KEY;
+
+  const response = await axios.get(
+    "https://api.geoapify.com/v1/geocode/autocomplete",
+    {
+      params: {
+        text: query,
+        limit: 8,
+        format: "json",
+        apiKey,
+      },
+    }
+  );
+
+  return response.data;
+};
+
+
 export default {
   getCoordinatesByCity,
+  searchLocations,
 };

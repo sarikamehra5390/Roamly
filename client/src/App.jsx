@@ -18,11 +18,17 @@ function App() {
 
     <Route path="/" element={<Home />} />
 
-    <Route path="/explore" element={<Explore />} />
+    <Route path="/explore" 
+           element={<Explore />} />
 
     <Route
         path="/destination/:id"
         element={<DestinationDetails />}
+    />
+
+    <Route
+            path="/destination/search"
+            element={<DestinationDetails />}
     />
 
     <Route path="/login" element={<Login />} />

@@ -1,137 +1,261 @@
-import { useMemo, useState } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+
+import api from "../services/api";
 import DestinationCard from "../components/DestinationCard";
 import destinations from "../data/destinations";
 
 function Explore() {
-    const [search, setSearch] = useState("");
-    const [category, setCategory] = useState("All");
+  const navigate = useNavigate();
 
-    const filteredDestinations = useMemo(() => {
-        return destinations.filter((destination) => {
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
-            const matchesSearch =
-                destination.name
-                    .toLowerCase()
-                    .includes(search.toLowerCase());
+  const [category, setCategory] = useState("All");
 
-            const matchesCategory =
-                category === "All" ||
-                destination.category === category;
+  const filteredDestinations = useMemo(() => {
+    return destinations.filter((destination) => {
+      const matchesSearch =
+        destination.name
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
+        destination.country
+          .toLowerCase()
+          .includes(search.toLowerCase());
 
-            return matchesSearch && matchesCategory;
-        });
-    }, [search, category]);
+      const matchesCategory =
+        category === "All" ||
+        destination.category === category;
 
-    return (
-        <main className="min-h-screen bg-gray-50">
+      return matchesSearch && matchesCategory;
+    });
+  }, [search, category]);
 
-            {/* Header */}
-            <section className="border-b bg-white">
+  const handleSearch = async (event) => {
+    event.preventDefault();
 
-                <div className="mx-auto max-w-7xl px-6 py-12">
+    const query = search.trim();
 
-                    <p className="text-sm font-semibold uppercase tracking-widest text-gray-500">
-                        Discover
-                    </p>
+    if (query.length < 2) {
+      setSearchError("Please enter at least 2 characters.");
+      setSearchResults([]);
+      return;
+    }
 
-                    <h1 className="mt-2 text-4xl font-bold text-gray-900">
-                        Explore destinations
-                    </h1>
+    try {
+      setSearchLoading(true);
+      setSearchError("");
 
-                    <p className="mt-3 max-w-2xl text-gray-600">
-                        Discover places around the world and find your next adventure.
-                    </p>
+      const response = await api.get("/geocoding/search", {
+        params: {
+          query,
+        },
+      });
 
-                </div>
+      setSearchResults(response.data.results || []);
+    } catch (error) {
+      console.error("Destination search failed:", error);
 
-            </section>
+      setSearchError(
+        "Unable to search destinations. Please try again."
+      );
 
-            {/* Search + Filters */}
-            <section className="mx-auto max-w-7xl px-6 py-8">
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
-                <div className="flex flex-col gap-4 md:flex-row">
+  const handleResultClick = (result) => {
+    const name =
+      result.name ||
+      result.city ||
+      result.country ||
+      "Unknown destination";
 
-                    {/* Search */}
-                    <div className="flex flex-1 items-center rounded-xl border border-gray-200 bg-white px-4">
+    const country = result.country || "";
 
-                        <span className="mr-3 text-gray-400">
-                            🔍
-                        </span>
+    const params = new URLSearchParams({
+      name,
+      country,
+      lat: result.lat,
+      lon: result.lon,
+    });
 
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search destinations..."
-                            className="w-full py-3 outline-none"
-                        />
+    navigate(`/destination/search?${params.toString()}`);
+  };
 
-                    </div>
+  return (
+    <div className="mx-auto max-w-7xl px-6 py-12">
 
-                    {/* Category */}
-                    <select
-                        value={category}
-                        onChange={(event) => setCategory(event.target.value)}
-                        className="rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none"
-                    >
-                        <option value="All">All</option>
-                        <option value="Beach">Beach</option>
-                        <option value="City">City</option>
-                        <option value="Mountain">Mountain</option>
-                    </select>
+      {/* Header */}
+      <div>
+        <h1 className="text-4xl font-bold text-gray-900">
+          Explore the World
+        </h1>
 
-                </div>
+        <p className="mt-3 max-w-2xl text-lg text-gray-500">
+          Search for any destination and discover weather,
+          popular places and currency information.
+        </p>
+      </div>
 
-            </section>
 
-            {/* Results */}
-            <section className="mx-auto max-w-7xl px-6 pb-16">
+      {/* Search */}
+      <form
+        onSubmit={handleSearch}
+        className="mt-8 flex flex-col gap-3 sm:flex-row"
+      >
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setSearchError("");
+          }}
+          placeholder="Search any destination, city or country..."
+          className="flex-1 rounded-xl border border-gray-300 px-5 py-3.5 text-gray-900 outline-none transition focus:border-black"
+        />
 
-                <div className="mb-6 flex items-center justify-between">
+        <button
+          type="submit"
+          disabled={searchLoading}
+          className="rounded-xl bg-black px-7 py-3.5 font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {searchLoading ? "Searching..." : "Search"}
+        </button>
+      </form>
 
-                    <h2 className="text-2xl font-bold text-gray-900">
-                        Destinations
-                    </h2>
 
-                    <p className="text-sm text-gray-500">
-                        {filteredDestinations.length} destinations
-                    </p>
+      {/* Search Error */}
+      {searchError && (
+        <p className="mt-4 text-sm text-red-500">
+          {searchError}
+        </p>
+      )}
 
-                </div>
 
-                {filteredDestinations.length > 0 ? (
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-900">
+                Search Results
+              </h2>
 
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <p className="mt-1 text-sm text-gray-500">
+                Select a destination to explore it.
+              </p>
+            </div>
 
-                        {filteredDestinations.map((destination) => (
-                            <DestinationCard
-                                key={destination.id}
-                                destination={destination}
-                            />
-                        ))}
+            <button
+              onClick={() => setSearchResults([])}
+              className="text-sm text-gray-500 transition hover:text-black"
+            >
+              Clear
+            </button>
+          </div>
 
-                    </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {searchResults.map((result, index) => {
+              const name =
+                result.name ||
+                result.city ||
+                result.country ||
+                "Unknown location";
 
-                ) : (
+              const location =
+                result.formatted ||
+                [result.city, result.state, result.country]
+                  .filter(Boolean)
+                  .join(", ");
 
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-white py-16 text-center">
+              return (
+                <button
+                  key={result.place_id || index}
+                  onClick={() => handleResultClick(result)}
+                  className="text-left rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md"
+                >
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {name}
+                  </h3>
 
-                        <p className="text-lg font-medium text-gray-700">
-                            No destinations found
-                        </p>
+                  <p className="mt-2 text-sm leading-6 text-gray-500">
+                    {location}
+                  </p>
 
-                        <p className="mt-2 text-sm text-gray-500">
-                            Try searching for another destination.
-                        </p>
+                  <p className="mt-4 text-sm font-medium text-gray-900">
+                    Explore destination →
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
-                    </div>
 
-                )}
+      {/* Popular Destinations */}
+      <section className="mt-16">
 
-            </section>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900">
+              Popular Destinations
+            </h2>
 
-        </main>
-    );
+            <p className="mt-2 text-gray-500">
+              Explore some of our featured destinations.
+            </p>
+          </div>
+
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none"
+          >
+            <option value="All">All</option>
+            <option value="Beach">Beach</option>
+            <option value="City">City</option>
+            <option value="Mountain">Mountain</option>
+          </select>
+        </div>
+
+
+        {/* Count */}
+        <p className="mt-6 text-sm text-gray-500">
+          {filteredDestinations.length} destinations found
+        </p>
+
+
+        {/* Cards */}
+        {filteredDestinations.length > 0 ? (
+          <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredDestinations.map((destination) => (
+              <DestinationCard
+                key={destination.id}
+                destination={destination}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-10 text-center">
+            <h3 className="text-lg font-semibold text-gray-900">
+              No featured destinations found
+            </h3>
+
+            <p className="mt-2 text-gray-500">
+              Try searching for a destination above.
+            </p>
+          </div>
+        )}
+
+      </section>
+    </div>
+  );
 }
 
 export default Explore;
